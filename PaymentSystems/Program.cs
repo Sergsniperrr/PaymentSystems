@@ -11,12 +11,25 @@ class Program
         //order.system2.ru/pay?hash={MD5 хеш ID заказа + сумма заказа}
         //system3.com/pay?amount=12000&curency=RUB&hash={SHA-1 хеш сумма заказа + ID заказа + секретный ключ от системы}
 
-        Console.WriteLine(HashCreator.GetMD5(67));
-        Console.WriteLine(HashCreator.GetSHA1(67));
-        Console.WriteLine(HashCreator.GetSHA1(100));
-        Console.WriteLine(HashCreator.GetMD5(100));
+        int id = 12345;
+        int amount = 5500;
 
+        Order order = new Order(id, amount);
 
+        IPaymentSystem payment1 = new PaymentSystem1();
+        IPaymentSystem payment2 = new PaymentSystem2();
+        IPaymentSystem payment3 = new PaymentSystem3();
+
+        Console.WriteLine("Платежная система 1:");
+        Console.WriteLine(payment1.GetPayingLink(order));
+        Console.WriteLine();
+
+        Console.WriteLine("Платежная система 2:");
+        Console.WriteLine(payment2.GetPayingLink(order));
+        Console.WriteLine();
+
+        Console.WriteLine("Платежная система 3:");
+        Console.WriteLine(payment3.GetPayingLink(order));
 
         Console.Read();
     }
@@ -35,39 +48,50 @@ interface IPaymentSystem
     string GetPayingLink(Order order);
 }
 
-//abstract class PaymentSystem : IPaymentSystem
-//{
-//    private readonly Order _order;
-
-//    public string GetPayingLink(Order order)
-//    {
-//        return null;
-//    }
-//}
-
-class PaymentSystem1 : IPaymentSystem
+abstract class PaymentSystem : IPaymentSystem
 {
+    protected string AmountText(int amount) => $"amount={amount}";
+    protected string MD5HashIdText(int id) => $"hash={HashCreator.GetMD5(id)}";
+
     public string GetPayingLink(Order order)
+    {
+        return CreateLink(order);
+    }
+
+    protected virtual string CreateLink(Order order)
     {
         return null;
     }
 }
 
-class PaymentSystem2 : IPaymentSystem
+class PaymentSystem1 : PaymentSystem
 {
-    public string GetPayingLink(Order order)
+    protected override string CreateLink(Order order)
     {
+        string mainLink = "pay.system1.ru/order";
 
+        return $"{mainLink}?{AmountText(order.Amount)}RUB&{MD5HashIdText(order.Id)}";
     }
 }
 
-class PaymentSystem3 : IPaymentSystem
+class PaymentSystem2 : PaymentSystem
 {
-    private readonly Order _order;
-
-    public string GetPayingLink(Order order)
+    protected override string CreateLink(Order order)
     {
+        string mainLink = "order.system2.ru/pay";
 
+        return $"{mainLink}?{MD5HashIdText(order.Id)}+{order.Amount}";
+    }
+}
+
+class PaymentSystem3 : PaymentSystem
+{
+    protected override string CreateLink(Order order)
+    {
+        string mainLink = "system3.com/pay";
+
+        return $"{mainLink}?{AmountText(order.Amount)}&curency=RUB&hash={HashCreator.GetSHA1(order.Amount)}" +
+               $"+{order.Id}+{KeyGenerator.Create()}";
     }
 }
 
@@ -87,5 +111,15 @@ static class HashCreator
     {
         return String.Concat(algoritm.ComputeHash(BitConverter.GetBytes(value))
                             .Select(x => x.ToString("x2")));
+    }
+}
+
+static class KeyGenerator
+{
+    public static string Create()
+    {
+        int keySize = 1024;
+
+        return Convert.ToBase64String(new RSACryptoServiceProvider(keySize).ExportCspBlob(true));
     }
 }
