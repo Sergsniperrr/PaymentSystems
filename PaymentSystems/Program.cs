@@ -11,10 +11,12 @@ class Program
         //order.system2.ru/pay?hash={MD5 хеш ID заказа + сумма заказа}
         //system3.com/pay?amount=12000&curency=RUB&hash={SHA-1 хеш сумма заказа + ID заказа + секретный ключ от системы}
 
-        Console.WriteLine(HashCreator.Calculate(45, MD5.Create()));
-        Console.WriteLine(HashCreator.Calculate(45, SHA1.Create()));
-        Console.WriteLine(HashCreator.Calculate(45, SHA1.Create()));
-        Console.WriteLine(HashCreator.Calculate(45, MD5.Create()));
+        Console.WriteLine(HashCreator.GetMD5(67));
+        Console.WriteLine(HashCreator.GetSHA1(67));
+        Console.WriteLine(HashCreator.GetSHA1(100));
+        Console.WriteLine(HashCreator.GetMD5(100));
+
+
 
         Console.Read();
     }
@@ -33,14 +35,55 @@ interface IPaymentSystem
     string GetPayingLink(Order order);
 }
 
-interface IHashCreator
+//abstract class PaymentSystem : IPaymentSystem
+//{
+//    private readonly Order _order;
+
+//    public string GetPayingLink(Order order)
+//    {
+//        return null;
+//    }
+//}
+
+class PaymentSystem1 : IPaymentSystem
 {
-    string CalculateHash(int value);
+    public string GetPayingLink(Order order)
+    {
+        return null;
+    }
+}
+
+class PaymentSystem2 : IPaymentSystem
+{
+    public string GetPayingLink(Order order)
+    {
+
+    }
+}
+
+class PaymentSystem3 : IPaymentSystem
+{
+    private readonly Order _order;
+
+    public string GetPayingLink(Order order)
+    {
+
+    }
 }
 
 static class HashCreator
 {
-    public static string Calculate(int value, HashAlgorithm algoritm)
+    public static string GetMD5(int value)
+    {
+        return Calculate(value, MD5.Create());
+    }
+
+    public static string GetSHA1(int value)
+    {
+        return Calculate(value, SHA1.Create());
+    }
+
+    private static string Calculate(int value, HashAlgorithm algoritm)
     {
         return String.Concat(algoritm.ComputeHash(BitConverter.GetBytes(value))
                             .Select(x => x.ToString("x2")));
