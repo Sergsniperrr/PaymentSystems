@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 using System.Linq;
 using System.Security.Cryptography;
 
@@ -16,16 +17,18 @@ class Program
 
         Order order = new Order(id, amount);
 
-        IPaymentSystem payment1 = new PaymentSystem1();
-        IPaymentSystem payment2 = new PaymentSystem2();
-        IPaymentSystem payment3 = new PaymentSystem3();
+        IPaymentSystem payment1 = new PaymentSystem1(new MD5HashGenerator());
+        IPaymentSystem payment2 = new PaymentSystem2(new MD5HashGenerator());
+        IPaymentSystem payment3 = new PaymentSystem3(new SHA1HashGenerator());
 
         Console.WriteLine("Платежная система 1:");
         Console.WriteLine(payment1.GetPayingLink(order));
+
         Console.WriteLine();
 
         Console.WriteLine("Платежная система 2:");
         Console.WriteLine(payment2.GetPayingLink(order));
+
         Console.WriteLine();
 
         Console.WriteLine("Платежная система 3:");
@@ -37,10 +40,15 @@ class Program
 
 class Order
 {
-    public readonly int Id;
-    public readonly int Amount;
+    public Order(int id, int amount)
+    {
+        Id = id;
+        Amount = amount;
+    }
 
-    public Order(int id, int amount) => (Id, Amount) = (id, amount);
+    public int Id { get; }
+    public int Amount { get; }
+
 }
 
 interface IPaymentSystem
@@ -48,75 +56,95 @@ interface IPaymentSystem
     string GetPayingLink(Order order);
 }
 
-abstract class PaymentSystem : IPaymentSystem
+class PaymentSystem1 : IPaymentSystem
 {
-    protected string AmountText(int amount) => $"amount={amount}";
-    protected string MD5HashIdText(int id) => $"hash={HashCreator.GetMD5(id)}";
+    private readonly HashGenerator _hashGenerator;
+
+    public PaymentSystem1(HashGenerator hashGenerator)
+    {
+        _hashGenerator = hashGenerator;
+    }
 
     public string GetPayingLink(Order order)
     {
-        return CreateLink(order);
-    }
-
-    protected virtual string CreateLink(Order order)
-    {
-        return null;
-    }
-}
-
-class PaymentSystem1 : PaymentSystem
-{
-    protected override string CreateLink(Order order)
-    {
         string mainLink = "pay.system1.ru/order";
 
-        return $"{mainLink}?{AmountText(order.Amount)}RUB&{MD5HashIdText(order.Id)}";
+        return $"{mainLink}?amount={order.Amount}RUB&hash={_hashGenerator.Compute(order.Id.ToString())}";
     }
 }
 
-class PaymentSystem2 : PaymentSystem
+class PaymentSystem2 : IPaymentSystem
 {
-    protected override string CreateLink(Order order)
+    private readonly HashGenerator _hashGenerator;
+
+    public PaymentSystem2(HashGenerator hashGenerator)
+    {
+        _hashGenerator = hashGenerator;
+    }
+
+    public string GetPayingLink(Order order)
     {
         string mainLink = "order.system2.ru/pay";
+        string dataForHashing = String.Concat(order.Id, order.Amount);
 
-        return $"{mainLink}?{MD5HashIdText(order.Id)}+{order.Amount}";
+        return $"{mainLink}?hash={_hashGenerator.Compute(dataForHashing)}";
     }
 }
 
-class PaymentSystem3 : PaymentSystem
+class PaymentSystem3 : IPaymentSystem
 {
-    protected override string CreateLink(Order order)
+    private readonly HashGenerator _hashGenerator;
+
+    public PaymentSystem3(HashGenerator hashGenerator)
+    {
+        _hashGenerator = hashGenerator;
+    }
+
+    public string GetPayingLink(Order order)
     {
         string mainLink = "system3.com/pay";
+        string dataForHashing = String.Concat(order.Amount, order.Id, KeyGenerator.Generate());
 
-        return $"{mainLink}?{AmountText(order.Amount)}&curency=RUB&hash={HashCreator.GetSHA1(order.Amount)}" +
-               $"+{order.Id}+{KeyGenerator.Create()}";
+        return $"{mainLink}?amount={order.Amount}&curency=RUB&hash={_hashGenerator.Compute(dataForHashing)}";
     }
 }
 
-static class HashCreator
+abstract class HashGenerator
 {
-    public static string GetMD5(int value)
+    private readonly HashAlgorithm _algorithm;
+
+    protected HashGenerator(HashAlgorithm algorithm)
     {
-        return Calculate(value, MD5.Create());
+        _algorithm = algorithm;
     }
 
-    public static string GetSHA1(int value)
+    public string Compute(string text)
     {
-        return Calculate(value, SHA1.Create());
-    }
+        StringBuilder result = new StringBuilder();
 
-    private static string Calculate(int value, HashAlgorithm algoritm)
-    {
-        return String.Concat(algoritm.ComputeHash(BitConverter.GetBytes(value))
-                            .Select(x => x.ToString("x2")));
+        byte[] input = Encoding.ASCII.GetBytes(text);
+        byte[] hash = _algorithm.ComputeHash(input);
+
+        for (int i = 0; i < hash.Length; i++)
+            result.Append(hash[i].ToString("X2"));
+
+        return result.ToString();
     }
+}
+
+class MD5HashGenerator : HashGenerator
+{
+    public MD5HashGenerator() : base(MD5.Create()) { }
+}
+
+class SHA1HashGenerator : HashGenerator
+{
+    public SHA1HashGenerator() : base(SHA1.Create()) { }
 }
 
 static class KeyGenerator
 {
-    public static string Create()
+    public static string Generate()
     {
         int keySize = 1024;
 
